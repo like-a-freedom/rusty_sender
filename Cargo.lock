@@ -95,7 +95,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusty_syslog"
+name = "rusty_sender"
 version = "1.0.0"
 dependencies = [
  "log",

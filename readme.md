@@ -4,5 +4,6 @@ It's a very simple utility that read file line by line and then send the line to
 
 ## How to use
 
-Syntax: `./rusty_syslog <file_path> <hostname> <port> <tcp/udp>`
-Example: `./rusty_syslog "/windows_events" "10.10.10.100" "5140" "udp"`
+Syntax: `./rusty_sender <file_path> <hostname> <port> <tcp/udp>`
+
+Example: `./rusty_sender "/windows_events" "10.10.10.100" "5140" "udp"`
