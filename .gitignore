@@ -11,6 +11,7 @@
 ## File system
 .DS_Store
 desktop.ini
+py_sender.py
 
 ## Editor
 *.swp
