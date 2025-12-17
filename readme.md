@@ -1,4 +1,4 @@
-# rusty_sender ⚡
+# Rusty sender ⚡
 
 [![.github/workflows/rust.yml](https://github.com/like-a-freedom/rusty_sender/actions/workflows/rust.yml/badge.svg)](https://github.com/like-a-freedom/rusty_sender/actions/workflows/rust.yml) [![Release](https://img.shields.io/github/v/release/like-a-freedom/rusty_sender?label=release)](https://github.com/like-a-freedom/rusty_sender/releases) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Rust](https://img.shields.io/badge/built_with-Rust-orange.svg)](https://www.rust-lang.org/) [![codecov](https://codecov.io/gh/like-a-freedom/rusty_sender/branch/master/graph/badge.svg)](https://codecov.io/gh/like-a-freedom/rusty_sender)
 
