@@ -6,25 +6,88 @@ on:
 
 jobs:
   release:
-    name: release ${{ matrix.target }}
-    runs-on: ubuntu-latest
+    name: Build and release ${{ matrix.platform.os_name }}
+    if: github.event_name == 'release'
+    runs-on: ${{ matrix.platform.os }}
+    permissions:
+      contents: write
+      packages: write
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: x86_64-pc-windows-gnu
-            archive: zip
-          - target: x86_64-unknown-linux-musl
-            archive: tar.gz tar.xz tar.zst
-          - target: x86_64-apple-darwin
-            archive: zip
+        platform:
+          - os_name: Linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: rusty_sender_linux_x86_64
+          - os_name: macOS-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bin: rusty_sender_macos_x86_64
+          - os_name: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-gnu
+            bin: rusty_sender_windows_x86_64.exe
     steps:
-      - uses: actions/checkout@master
-      - name: Compile and release
-        uses: rust-build/rust-build.action@v1.4.5
+      - uses: actions/checkout@v6
+
+      - name: Cache cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Set up Rust toolchain (with cache)
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+        with:
+          toolchain: nightly
+          components: clippy
+          cache: true
+          cache-workspaces: true
+          target: ${{ matrix.platform.target }}
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target/${{ matrix.platform.target }}
+          key: ${{ runner.os }}-cargo-target-${{ matrix.platform.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build binary
+        run: cargo build -p rusty_sender --release --target ${{ matrix.platform.target }}
+
+      - name: Prepare artifact (Unix)
+        if: matrix.platform.os != 'windows-latest'
+        run: |
+          mkdir -p app/${{ matrix.platform.target }}
+          cp target/${{ matrix.platform.target }}/release/rusty_sender app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
+
+      - name: Prepare artifact (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path app/${{ matrix.platform.target }}
+          Copy-Item target/${{ matrix.platform.target }}/release/rusty_sender.exe app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
+
+      - name: Generate SHA-256 (Unix)
+        if: matrix.platform.os != 'windows-latest'
+        run: |
+          shasum -a 256 app/${{ matrix.platform.target }}/${{ matrix.platform.bin }} | cut -d ' ' -f 1 > app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}.sha256
+
+      - name: Generate SHA-256 (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          (Get-FileHash -Algorithm SHA256 app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}).Hash.ToLower() | Out-File -Encoding ascii app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}.sha256
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}
+            app/${{ matrix.platform.target }}/${{ matrix.platform.bin }}.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          RUSTTARGET: ${{ matrix.target }}
-          ARCHIVE_TYPES: ${{ matrix.archive }}
-          TOOLCHAIN_VERSION: nightly
