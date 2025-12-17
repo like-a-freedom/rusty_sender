@@ -1,8 +1,26 @@
 [package]
 name = "rusty_sender"
 version = "1.0.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-syslog = "^6.0"
-log = "^0.4"
+syslog = "^7.0"
+log = "^0.4.29"
+
+[profile.dev]
+opt-level = 1
+debug = 1
+incremental = true
+codegen-units = 256
+
+[profile.test]
+debug = 1
+incremental = true
+codegen-units = 256
+opt-level = 0
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
