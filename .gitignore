@@ -38,6 +38,7 @@ Session.vim
 config.mk
 config.stamp
 no_llvm_build
+AGENTS.md
 
 ## Build
 /dl/
