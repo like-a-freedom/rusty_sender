@@ -160,3 +160,99 @@ fn main() -> Result<(), std::io::Error> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+    use std::net::{TcpListener, UdpSocket};
+    use std::thread;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_batch_size_from_args_equals() {
+        let args = vec!["prog".into(), "--batch-size=128".into()];
+        assert_eq!(batch_size_from_args(&args), Some(128));
+    }
+
+    #[test]
+    fn test_batch_size_from_args_space() {
+        let args = vec!["prog".into(), "--batch-size".into(), "32".into()];
+        assert_eq!(batch_size_from_args(&args), Some(32));
+    }
+
+    #[test]
+    fn test_batch_size_from_args_invalid() {
+        let args = vec!["prog".into(), "--batch-size".into(), "x".into()];
+        assert_eq!(batch_size_from_args(&args), None);
+    }
+
+    use serial_test::serial;
+
+    #[serial]
+    fn test_batch_size_from_env() {
+        unsafe { std::env::set_var("BATCH_SIZE", "16") };
+        assert_eq!(batch_size_from_env(), 16);
+        unsafe { std::env::remove_var("BATCH_SIZE") };
+    }
+
+    #[test]
+    fn test_send_lines_tcp_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        let mut tmp = NamedTempFile::new()?;
+        write!(tmp, "a\nb\nc\n")?;
+        let path = tmp.path().to_str().unwrap().to_string();
+
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let addr = listener.local_addr()?;
+
+        let handle = thread::spawn(move || {
+            // Use batch size 2 to force batching behaviour
+            send_lines_tcp(&path, addr, 2).unwrap()
+        });
+
+        let (mut stream, _) = listener.accept()?;
+        let mut buf = Vec::new();
+        stream.read_to_end(&mut buf)?;
+
+        let sent = handle.join().unwrap();
+        // split by newline and discard empty trailing
+        let lines: Vec<&[u8]> = buf.split(|b| *b == b'\n').filter(|s| !s.is_empty()).collect();
+        assert_eq!(lines.len(), sent);
+        assert_eq!(lines.len(), 3);
+        Ok(())
+    }
+
+    #[serial]
+    fn test_send_lines_udp_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        let mut tmp = NamedTempFile::new()?;
+        write!(tmp, "1\n2\n3\n4\n5\n")?;
+        let path = tmp.path().to_str().unwrap().to_string();
+
+        // server
+        let server = UdpSocket::bind("127.0.0.1:0")?;
+        server.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
+        let server_addr = server.local_addr()?;
+
+        // set small batch size via env
+        unsafe { std::env::set_var("BATCH_SIZE", "2") };
+        let sent = send_lines_udp(&path, server_addr)?;
+        unsafe { std::env::remove_var("BATCH_SIZE") };
+
+        let mut total_bytes = Vec::new();
+        for _ in 0..(sent / 2 + 1) {
+            let mut buf = [0u8; 2048];
+            match server.recv(&mut buf) {
+                Ok(n) => total_bytes.extend_from_slice(&buf[..n]),
+                Err(_e) => {
+                    // if timeout, break
+                    break;
+                }
+            }
+        }
+
+        let lines: Vec<&[u8]> = total_bytes.split(|b| *b == b'\n').filter(|s| !s.is_empty()).collect();
+        assert_eq!(lines.len(), sent);
+        assert_eq!(sent, 5);
+        Ok(())
+    }
+}
