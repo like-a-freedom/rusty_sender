@@ -7,6 +7,9 @@ edition = "2024"
 syslog = "^7.0"
 log = "^0.4.29"
 
+[dev-dependencies]
+criterion = "^0.8.1"
+
 [profile.dev]
 opt-level = 1
 debug = 1
@@ -24,3 +27,7 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[[bench]]
+name = "eps"
+harness = false
