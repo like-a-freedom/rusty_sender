@@ -2,7 +2,11 @@ use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpStream, UdpSocket};
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant};
+
+const BATCH_SIZE: usize = 1000; // Adjust batch size as needed
 
 fn read_file_line_by_line(file_path: &str) -> Result<Vec<String>, std::io::Error> {
     let file = File::open(file_path)?;
@@ -12,18 +16,38 @@ fn read_file_line_by_line(file_path: &str) -> Result<Vec<String>, std::io::Error
 }
 
 fn send_lines_tcp(lines: Vec<String>, remote_host: String) -> Result<(), std::io::Error> {
-    for line in lines {
-        let mut stream = TcpStream::connect(remote_host.clone())?;
-        writeln!(stream, "{}", line)?;
+    let stream = TcpStream::connect(remote_host)?;
+    let mut lines_sent = 0;
+
+    for batch in lines.chunks(BATCH_SIZE) {
+        let mut batch_str = String::new();
+        for line in batch {
+            batch_str.push_str(line);
+            batch_str.push('\n');
+        }
+        writeln!(stream, "{}", batch_str)?;
+        lines_sent += batch.len();
     }
+
     Ok(())
 }
 
 fn send_lines_udp(lines: Vec<String>, remote_host: String) -> Result<(), std::io::Error> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
-    for line in lines {
-        socket.send_to(line.as_bytes(), &remote_host)?;
+    socket.set_nonblocking(true)?;
+
+    let mut lines_sent = 0;
+
+    for batch in lines.chunks(BATCH_SIZE) {
+        let mut batch_str = String::new();
+        for line in batch {
+            batch_str.push_str(line);
+            batch_str.push('\n');
+        }
+        socket.send_to(batch_str.as_bytes(), &remote_host)?;
+        lines_sent += batch.len();
     }
+
     Ok(())
 }
 
@@ -47,10 +71,22 @@ fn main() -> Result<(), std::io::Error> {
 
     match protocol.as_str() {
         "tcp" => {
-            send_lines_tcp(lines, remote_host)?;
+            let lines_arc = Arc::new(Mutex::new(lines));
+            let remote_host_tcp = remote_host.clone();
+            let thread_handle = thread::spawn(move || {
+                let lines = lines_arc.lock().unwrap();
+                send_lines_tcp(lines.clone(), remote_host_tcp).unwrap();
+            });
+            thread_handle.join().unwrap();
         }
         "udp" => {
-            send_lines_udp(lines, remote_host)?;
+            let lines_arc = Arc::new(Mutex::new(lines));
+            let remote_host_udp = remote_host.clone();
+            let thread_handle = thread::spawn(move || {
+                let lines = lines_arc.lock().unwrap();
+                send_lines_udp(lines.clone(), remote_host_udp).unwrap();
+            });
+            thread_handle.join().unwrap();
         }
         _ => {
             eprintln!("Invalid protocol specified: {}", protocol);
