@@ -73,7 +73,6 @@ BATCH_SIZE=128 ./rusty_sender ./example_data/other_events 10.10.10.100 5140 udp
 - Event files may live anywhere the process can read from — provide the path as the first positional argument.
 - Example file locations in this repo:
   - `example_data/` — compact example datasets
-  - `mocks/` — additional test event sets
 
 ### Format requirements
 - Plain text (UTF-8 recommended).
