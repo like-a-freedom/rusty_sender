@@ -55,11 +55,11 @@ fn tcp_batch_bench(c: &mut Criterion) {
     let addr = listener.local_addr().expect("local addr");
 
     // Accept loop: accept multiple connections and spawn a drain thread for each
-        thread::spawn(move || {
-            while let Ok((stream, _)) = listener.accept() {
-                thread::spawn(move || tcp_drain_loop(stream));
-            }
-        });
+    thread::spawn(move || {
+        while let Ok((stream, _)) = listener.accept() {
+            thread::spawn(move || tcp_drain_loop(stream));
+        }
+    });
 
     let mut group = c.benchmark_group("tcp_send_batch");
     let payload = b"<134>Jan  1 00:00:00 host app: test event line";
