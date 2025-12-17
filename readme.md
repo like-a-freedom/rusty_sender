@@ -30,7 +30,7 @@ Small, fast utility to send event files to a remote TCP or UDP endpoint (useful 
 - TCP and UDP sending modes
 - Batched sends to reduce syscall overhead
 - Configurable batch size via `--batch-size` or `BATCH_SIZE` env var
-- Includes sample event files for testing/benchmarks (`example_data/`, `mocks/`)
+- Includes sample event files for testing/benchmarks (`example_data/`)
 
 ## Quick start
 

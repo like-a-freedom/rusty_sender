@@ -21,10 +21,8 @@ fn batch_size_from_args(args: &[String]) -> Option<usize> {
         if let Some(val) = a.strip_prefix("--batch-size=") {
             return val.parse::<usize>().ok().filter(|&n| n > 0);
         }
-        if a == "--batch-size" {
-            if i + 1 < args.len() {
-                return args[i + 1].parse::<usize>().ok().filter(|&n| n > 0);
-            }
+        if a == "--batch-size" && i + 1 < args.len() {
+            return args[i + 1].parse::<usize>().ok().filter(|&n| n > 0);
         }
         i += 1;
     }
@@ -140,7 +138,7 @@ fn main() -> Result<(), std::io::Error> {
     let remote_addr = resolve_target(hostname, port)?;
 
     let start_time = Instant::now();
-    let batch_size = batch_size_from_args(&args).unwrap_or_else(|| batch_size_from_env());
+    let batch_size = batch_size_from_args(&args).unwrap_or_else(batch_size_from_env);
     eprintln!("Using batch size: {}", batch_size);
 
     let total_lines = match protocol.as_str() {
