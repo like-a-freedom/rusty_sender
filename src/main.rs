@@ -2,7 +2,7 @@ use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpStream, UdpSocket};
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 
 fn read_file_line_by_line(file_path: &str) -> Result<Vec<String>, std::io::Error> {
     let file = File::open(file_path)?;
