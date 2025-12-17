@@ -4,6 +4,16 @@ use std::io::{self, BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::time::Instant;
 
+const DEFAULT_BATCH_SIZE: usize = 64;
+
+fn batch_size_from_env() -> usize {
+    std::env::var("BATCH_SIZE")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|&n| n > 0)
+        .unwrap_or(DEFAULT_BATCH_SIZE)
+}
+
 fn resolve_target(hostname: &str, port: &str) -> io::Result<SocketAddr> {
     let target = format!("{}:{}", hostname, port);
     target
@@ -24,22 +34,20 @@ fn send_batch_tcp(stream: &mut TcpStream, batch: &[Vec<u8>]) -> io::Result<()> {
     stream.write_all(&buf)
 }
 
-fn send_lines_tcp(file_path: &str, remote: SocketAddr) -> io::Result<usize> {
-    const CHUNK: usize = 64;
-
+fn send_lines_tcp(file_path: &str, remote: SocketAddr, batch_size: usize) -> io::Result<usize> {
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
     let mut stream = TcpStream::connect(remote)?;
     stream.set_nodelay(true)?;
 
-    let mut batch: Vec<Vec<u8>> = Vec::with_capacity(CHUNK);
+    let mut batch: Vec<Vec<u8>> = Vec::with_capacity(batch_size);
     let mut lines_sent = 0usize;
 
     for line in reader.lines() {
         let line = line?.into_bytes();
         batch.push(line);
 
-        if batch.len() == CHUNK {
+        if batch.len() == batch_size {
             send_batch_tcp(&mut stream, &batch)?;
             lines_sent += batch.len();
             batch.clear();
@@ -61,16 +69,36 @@ fn send_lines_udp(file_path: &str, remote: SocketAddr) -> io::Result<usize> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.connect(remote)?;
 
-    let mut buffer = Vec::with_capacity(1024);
+    let batch_size = batch_size_from_env();
+    let mut batch: Vec<Vec<u8>> = Vec::with_capacity(batch_size);
     let mut lines_sent = 0usize;
 
     for line in reader.lines() {
         let line = line?;
-        buffer.clear();
-        buffer.extend_from_slice(line.as_bytes());
-        buffer.push(b'\n');
-        socket.send(&buffer)?;
-        lines_sent += 1;
+        batch.push(line.into_bytes());
+
+        if batch.len() == batch_size {
+            let estimated: usize = batch.iter().map(|l| l.len() + 1).sum();
+            let mut buf = Vec::with_capacity(estimated);
+            for l in &batch {
+                buf.extend_from_slice(l);
+                buf.push(b'\n');
+            }
+            socket.send(&buf)?;
+            lines_sent += batch.len();
+            batch.clear();
+        }
+    }
+
+    if !batch.is_empty() {
+        let estimated: usize = batch.iter().map(|l| l.len() + 1).sum();
+        let mut buf = Vec::with_capacity(estimated);
+        for l in &batch {
+            buf.extend_from_slice(l);
+            buf.push(b'\n');
+        }
+        socket.send(&buf)?;
+        lines_sent += batch.len();
     }
 
     Ok(lines_sent)
@@ -91,8 +119,11 @@ fn main() -> Result<(), std::io::Error> {
     let remote_addr = resolve_target(hostname, port)?;
 
     let start_time = Instant::now();
+    let batch_size = batch_size_from_env();
+    eprintln!("Using batch size: {}", batch_size);
+
     let total_lines = match protocol.as_str() {
-        "tcp" => send_lines_tcp(file_path, remote_addr)?,
+        "tcp" => send_lines_tcp(file_path, remote_addr, batch_size)?,
         "udp" => send_lines_udp(file_path, remote_addr)?,
         _ => {
             eprintln!("Invalid protocol specified: {}", protocol);
