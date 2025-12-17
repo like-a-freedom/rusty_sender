@@ -216,7 +216,10 @@ mod tests {
 
         let sent = handle.join().unwrap();
         // split by newline and discard empty trailing
-        let lines: Vec<&[u8]> = buf.split(|b| *b == b'\n').filter(|s| !s.is_empty()).collect();
+        let lines: Vec<&[u8]> = buf
+            .split(|b| *b == b'\n')
+            .filter(|s| !s.is_empty())
+            .collect();
         assert_eq!(lines.len(), sent);
         assert_eq!(lines.len(), 3);
         Ok(())
@@ -250,7 +253,10 @@ mod tests {
             }
         }
 
-        let lines: Vec<&[u8]> = total_bytes.split(|b| *b == b'\n').filter(|s| !s.is_empty()).collect();
+        let lines: Vec<&[u8]> = total_bytes
+            .split(|b| *b == b'\n')
+            .filter(|s| !s.is_empty())
+            .collect();
         assert_eq!(lines.len(), sent);
         assert_eq!(sent, 5);
         Ok(())
