@@ -14,6 +14,23 @@ fn batch_size_from_env() -> usize {
         .unwrap_or(DEFAULT_BATCH_SIZE)
 }
 
+fn batch_size_from_args(args: &[String]) -> Option<usize> {
+    let mut i = 0;
+    while i < args.len() {
+        let a = &args[i];
+        if let Some(val) = a.strip_prefix("--batch-size=") {
+            return val.parse::<usize>().ok().filter(|&n| n > 0);
+        }
+        if a == "--batch-size" {
+            if i + 1 < args.len() {
+                return args[i + 1].parse::<usize>().ok().filter(|&n| n > 0);
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
 fn resolve_target(hostname: &str, port: &str) -> io::Result<SocketAddr> {
     let target = format!("{}:{}", hostname, port);
     target
@@ -107,8 +124,12 @@ fn send_lines_udp(file_path: &str, remote: SocketAddr) -> io::Result<usize> {
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = env::args().collect();
 
+    // Minimal CLI parsing: support positional args plus an optional --batch-size flag
     if args.len() < 5 {
-        eprintln!("Usage: {} <file_path> <hostname> <port> <tcp/udp>", args[0]);
+        eprintln!(
+            "Usage: {} [--batch-size N] <file_path> <hostname> <port> <tcp/udp>",
+            args[0]
+        );
         std::process::exit(1);
     }
 
@@ -119,7 +140,7 @@ fn main() -> Result<(), std::io::Error> {
     let remote_addr = resolve_target(hostname, port)?;
 
     let start_time = Instant::now();
-    let batch_size = batch_size_from_env();
+    let batch_size = batch_size_from_args(&args).unwrap_or_else(|| batch_size_from_env());
     eprintln!("Using batch size: {}", batch_size);
 
     let total_lines = match protocol.as_str() {
