@@ -19,7 +19,7 @@ fn resolve_target(hostname: &str, port: &str) -> io::Result<SocketAddr> {
     target
         .to_socket_addrs()?
         .next()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "failed to resolve target address"))
+        .ok_or_else(|| io::Error::other("failed to resolve target address"))
 }
 
 fn send_batch_tcp(stream: &mut TcpStream, batch: &[Vec<u8>]) -> io::Result<()> {

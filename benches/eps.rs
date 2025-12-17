@@ -1,7 +1,7 @@
 use std::hint::black_box as std_black_box;
 use std::net::UdpSocket;
 
-use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 
 fn udp_send_bench(c: &mut Criterion) {
     let receiver = UdpSocket::bind("127.0.0.1:0").expect("bind receiver");
